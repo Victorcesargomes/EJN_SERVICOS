@@ -1,0 +1,22 @@
+# Variáveis de ambiente - NUNCA enviar
+.env
+
+# Ambiente virtual Python
+venv/
+.venv/
+
+# Logs
+*.log
+app.log
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,128 @@
+data;faturamento;despesa;descricao;lucro
+01/12/2025;0,00;0,00;Receita de vendas;0,00
+01/12/2025;0,00;66,68;Combustível;-66,68
+01/12/2025;0,00;11,10;Pedágios;-11,10
+01/12/2025;0,00;80,00;Despesas Diversas;-80,00
+01/12/2025;0,00;80,00;Despesas Diversas;-80,00
+01/12/2025;0,00;22,00;Despesas Diversas;-22,00
+01/12/2025;0,00;11,00;Pedágios;-11,00
+01/12/2025;0,00;100,03;Despesas Diversas;-100,03
+02/12/2025;0,00;5,60;Pedágios;-5,60
+02/12/2025;0,00;12,90;Despesas Diversas;-12,90
+02/12/2025;0,00;39,69;Despesas Diversas;-39,69
+04/12/2025;0,00;50,00;Combustível;-50,00
+04/12/2025;0,00;2070,30;Despesas Diversas;-2070,30
+04/12/2025;0,00;308,99;Despesas Diversas;-308,99
+04/12/2025;0,00;49,76;Despesas Diversas;-49,76
+04/12/2025;0,00;527,31;Despesas Diversas;-527,31
+04/12/2025;0,00;2100,00;Despesas Diversas;-2100,00
+04/12/2025;0,00;120,00;Despesas Diversas;-120,00
+04/12/2025;0,00;7,00;Despesas Diversas;-7,00
+04/12/2025;0,00;60,00;Despesas Diversas;-60,00
+04/12/2025;0,00;10,00;Despesas Diversas;-10,00
+04/12/2025;0,00;14,00;Pedágios;-14,00
+04/12/2025;0,00;250,00;Despesas Diversas;-250,00
+05/12/2025;0,00;62,60;Despesas Diversas;-62,60
+05/12/2025;0,00;11,10;Pedágios;-11,10
+05/12/2025;0,00;11,10;Pedágios;-11,10
+05/12/2025;0,00;563,07;Despesas Diversas;-563,07
+05/12/2025;0,00;274,56;Despesas Diversas;-274,56
+05/12/2025;0,00;1880,57;Despesas Diversas;-1880,57
+05/12/2025;0,00;6000,00;Despesas Diversas;-6000,00
+05/12/2025;0,00;3000,00;Despesas Diversas;-3000,00
+06/12/2025;0,00;63,00;Despesas Diversas;-63,00
+06/12/2025;0,00;51,97;Despesas Diversas;-51,97
+06/12/2025;0,00;7,80;Despesas Diversas;-7,80
+06/12/2025;0,00;30,00;Despesas Diversas;-30,00
+07/12/2025;0,00;13,50;Despesas Diversas;-13,50
+07/12/2025;0,00;58,10;Despesas Diversas;-58,10
+07/12/2025;0,00;100,00;Despesas Diversas;-100,00
+08/12/2025;0,00;60,94;Despesas Diversas;-60,94
+08/12/2025;0,00;370,00;Despesas Diversas;-370,00
+08/12/2025;0,00;110,00;Despesas Diversas;-110,00
+08/12/2025;0,00;22,00;Despesas Diversas;-22,00
+08/12/2025;0,00;40,84;Despesas Diversas;-40,84
+08/12/2025;0,00;38,00;Despesas Diversas;-38,00
+08/12/2025;0,00;166,00;Despesas Diversas;-166,00
+09/12/2025;0,00;102,00;Despesas Diversas;-102,00
+09/12/2025;0,00;5,60;Pedágios;-5,60
+09/12/2025;0,00;5,60;Pedágios;-5,60
+09/12/2025;0,00;120,00;Despesas Diversas;-120,00
+10/12/2025;0,00;65,64;Despesas Diversas;-65,64
+10/12/2025;0,00;50,00;Despesas Diversas;-50,00
+10/12/2025;0,00;60,00;Despesas Diversas;-60,00
+10/12/2025;0,00;80,00;Despesas Diversas;-80,00
+11/12/2025;0,00;76,60;Despesas Diversas;-76,60
+11/12/2025;0,00;120,00;Despesas Diversas;-120,00
+11/12/2025;0,00;5,60;Pedágios;-5,60
+11/12/2025;0,00;5,60;Pedágios;-5,60
+11/12/2025;10000,00;0,00;Resgate Aplicação_Financeira;10000,00
+11/12/2025;0,00;149,50;Despesas Diversas;-149,50
+11/12/2025;0,00;34,96;Despesas Diversas;-34,96
+11/12/2025;0,00;8,48;Despesas Diversas;-8,48
+12/12/2025;0,00;2000,00;Mão de Obra;-2000,00
+12/12/2025;0,00;10,00;Despesas Diversas;-10,00
+12/12/2025;0,00;46,00;Despesas Diversas;-46,00
+13/12/2025;0,00;5,00;Despesas Diversas;-5,00
+13/12/2025;0,00;600,00;Mão de Obra;-600,00
+13/12/2025;0,00;1150,00;Despesas Diversas;-1150,00
+13/12/2025;0,00;6,00;Despesas Diversas;-6,00
+13/12/2025;0,00;77,90;Despesas Diversas;-77,90
+15/12/2025;0,00;110,83;Despesas Diversas;-110,83
+15/12/2025;0,00;11,10;Pedágios;-11,10
+15/12/2025;0,00;100,00;Despesas Diversas;-100,00
+15/12/2025;0,00;11,10;Pedágios;-11,10
+15/12/2025;0,00;280,00;Despesas Diversas;-280,00
+15/12/2025;0,00;100,00;Despesas Diversas;-100,00
+15/12/2025;0,00;230,91;Despesas Diversas;-230,91
+15/12/2025;0,00;10,00;Despesas Diversas;-10,00
+15/12/2025;0,00;300,00;Honorários Contábeis;-300,00
+15/12/2025;0,00;718,02;Despesas Diversas;-718,02
+16/12/2025;0,00;235,20;Despesas Diversas;-235,20
+16/12/2025;0,00;78,01;Despesas Diversas;-78,01
+16/12/2025;0,00;40,15;Despesas Diversas;-40,15
+16/12/2025;0,00;110,00;Despesas Diversas;-110,00
+17/12/2025;0,00;11,10;Pedágios;-11,10
+17/12/2025;0,00;10,00;Despesas Diversas;-10,00
+17/12/2025;0,00;11,10;Pedágios;-11,10
+17/12/2025;0,00;239,60;Despesas Diversas;-239,60
+17/12/2025;0,00;74,05;Despesas Diversas;-74,05
+17/12/2025;0,00;250,00;Despesas Diversas;-250,00
+17/12/2025;0,00;1800,00;Despesas Diversas;-1800,00
+17/12/2025;0,00;600,44;Despesas Diversas;-600,44
+17/12/2025;600,44;00,00;Estorno casar.com;600,44
+17/12/2025;0,00;600,44;Despesas Diversas;-600,44
+18/12/2025;0,00;9,90;Despesas Diversas;-9,90
+18/12/2025;0,00;116,40;Despesas Diversas;-116,40
+19/12/2025;0,00;27,00;Despesas Diversas;-27,00
+19/12/2025;0,00;12,00;Despesas Diversas;-12,00
+19/12/2025;0,00;31,90;Despesas Diversas;-31,90
+19/12/2025;0,00;9,25;Despesas Diversas;-9,25
+19/12/2025;0,00;126,78;Despesas Diversas;-126,78
+19/12/2025;0,00;50,00;Despesas Diversas;-50,00
+20/12/2025;0,00;11,10;Pedágios;-11,10
+20/12/2025;0,00;11,10;Pedágios;-11,10
+20/12/2025;0,00;17,00;Despesas Diversas;-17,00
+21/12/2025;0,00;11,10;Pedágios;-11,10
+21/12/2025;0,00;11,10;Pedágios;-11,10
+21/12/2025;0,00;24,00;Despesas Diversas;-24,00
+22/12/2025;4679,46;0,00;Restituição INSS;4679,46
+22/12/2025;0,00;6,00;Despesas Diversas;-6,00
+22/12/2025;0,00;30,00;Despesas Diversas;-30,00
+22/12/2025;0,00;50,00;Despesas Diversas;-50,00
+22/12/2025;0,00;3336,60;Simples Nacional;-3336,60
+22/12/2025;0,00;80,90;Simples Nacional;-80,90
+23/12/2025;4056,00;0,00;Receita de Serviços;4056,00
+23/12/2025;0,00;1000,00;Despesas Diversas;-1000,00
+23/12/2025;0,00;125,00;Despesas Diversas;-125,00
+24/12/2025;0,00;11,10;Pedágios;-11,10
+24/12/2025;0,00;11,10;Pedágios;-11,10
+26/12/2025;0,00;11,10;Pedágios;-11,10
+26/12/2025;0,00;11,10;Pedágios;-11,10
+26/12/2025;0,00;75,81;Despesas Diversas;-75,81
+26/12/2025;0,00;2553,00;Despesas Diversas;-2553,00
+28/12/2025;0,00;11,80;Despesas Diversas;-11,80
+30/12/2025;0,00;60,00;Despesas Diversas;-60,00
+31/12/2025;2500,00;0,00;Resgate Aplicação_Financeira;2500,00
+31/12/2025;0,00;2054,61;Despesas Diversas;-2054,61
+31/12/2025;0,00;600,00;Despesas Diversas;-600,00
