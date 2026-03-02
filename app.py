@@ -124,6 +124,16 @@ def carregar_df(caminho: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def filtrar_por_periodo(df: pd.DataFrame, data_inicio: datetime, data_fim: datetime) -> pd.DataFrame:
+    """Retorna o DataFrame filtrado pelo período selecionado."""
+    if df.empty or "data" not in df.columns:
+        return df
+    return df[
+        (df["data"] >= pd.Timestamp(data_inicio))
+        & (df["data"] <= pd.Timestamp(data_fim))
+    ]
+
+
 def df_para_prompt(df: pd.DataFrame) -> str:
     if df.empty:
         return "Nenhum dado disponível."
@@ -140,11 +150,8 @@ def df_para_prompt(df: pd.DataFrame) -> str:
     return df_display.to_csv(index=False, sep=";")
 
 
-dados_df = carregar_df(CSV_PATH)
-
-faturamento_total = dados_df["faturamento"].sum() if not dados_df.empty and "faturamento" in dados_df.columns else 0.0
-despesa_total     = dados_df["despesa"].sum()     if not dados_df.empty and "despesa" in dados_df.columns else 0.0
-lucro_total       = dados_df["lucro"].sum()       if not dados_df.empty and "lucro" in dados_df.columns else 0.0
+# DataFrame completo (sem filtro) — usado apenas para definir os limites do date_input
+dados_df_completo = carregar_df(CSV_PATH)
 
 ##############################
 # Análise Financeira Avançada #
@@ -174,9 +181,6 @@ def analisar_financas(df: pd.DataFrame) -> Dict[str, Any]:
         "despesas_recorrentes": despesas_recorrentes,
     }
 
-
-analise = analisar_financas(dados_df)
-
 ############################
 # Visualizações de Dados   #
 ############################
@@ -204,21 +208,18 @@ def plot_despesas(df: pd.DataFrame):
     return fig
 
 
-def plot_evolucao(df: pd.DataFrame, data_inicio: datetime, data_fim: datetime):
+def plot_evolucao(df: pd.DataFrame):
+    """Plota a evolução financeira do DataFrame já filtrado."""
     if df.empty or "data" not in df.columns:
         return None
-    df_periodo = df[
-        (df["data"] >= pd.Timestamp(data_inicio))
-        & (df["data"] <= pd.Timestamp(data_fim))
-    ]
-    if df_periodo.empty:
+    df_agrupado = df.groupby("data")[["faturamento", "despesa", "lucro"]].sum().reset_index()
+    if df_agrupado.empty:
         return None
-    df_agrupado = df_periodo.groupby("data")[["faturamento", "despesa", "lucro"]].sum().reset_index()
     fig = px.line(
         df_agrupado,
         x="data",
         y=["faturamento", "despesa", "lucro"],
-        title=f"Evolução Financeira: {data_inicio.strftime('%d/%m/%Y')} - {data_fim.strftime('%d/%m/%Y')}",
+        title="Evolução Financeira no Período",
         labels={"value": "Valor (R$)", "variable": "Indicador"},
         color_discrete_map={"faturamento": "#2ecc71", "despesa": "#e74c3c", "lucro": "#3498db"},
     )
@@ -256,7 +257,15 @@ def _criar_client() -> ChatGroq:
     return ChatGroq(api_key=API_KEY, model=MODEL_NAME)
 
 
-def _criar_chain(llm: ChatGroq):
+def _criar_chain(llm: ChatGroq, df_filtrado: pd.DataFrame, data_inicio, data_fim):
+    """Cria a chain com contexto do período filtrado."""
+    faturamento = df_filtrado["faturamento"].sum() if not df_filtrado.empty and "faturamento" in df_filtrado.columns else 0.0
+    despesa     = df_filtrado["despesa"].sum()     if not df_filtrado.empty and "despesa" in df_filtrado.columns else 0.0
+    lucro       = df_filtrado["lucro"].sum()       if not df_filtrado.empty and "lucro" in df_filtrado.columns else 0.0
+    analise     = analisar_financas(df_filtrado)
+
+    periodo_str = f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+
     system_message = f"""
 Você é Victor, assistente virtual da empresa de construção civil \"{CLIENT_NAME}\" do Elielcio.
 Fale **sempre** em português brasileiro, de forma clara e objetiva.
@@ -270,10 +279,10 @@ Você interage exclusivamente com o Elielcio, dono da empresa EJN SERVIÇOS.
 4. Para pedidos de certidões, forneça imediatamente o link de download.
 5. Use negrito apenas para valores numéricos importantes.
 
-**Resumo financeiro até {datetime.now().strftime('%d/%m/%Y')}**:
-- **Faturamento acumulado:** R$ {faturamento_total:,.2f}
-- **Despesa acumulada:** R$ {despesa_total:,.2f}
-- **Lucro acumulado:** R$ {lucro_total:,.2f}
+**Resumo financeiro do período {periodo_str}**:
+- **Faturamento acumulado:** R$ {faturamento:,.2f}
+- **Despesa acumulada:** R$ {despesa:,.2f}
+- **Lucro acumulado:** R$ {lucro:,.2f}
 
 **Análise detalhada**:
 - **Top 5 despesas**:
@@ -285,9 +294,9 @@ Você interage exclusivamente com o Elielcio, dono da empresa EJN SERVIÇOS.
 
 Certidões disponíveis: {', '.join(CERTIDOES.keys()) or 'nenhuma'}
 
-Base de dados detalhada:
+Base de dados detalhada (período {periodo_str}):
 ###
-{df_para_prompt(dados_df)}
+{df_para_prompt(df_filtrado)}
 ###
 
 - As colunas correspondem a `Data`, `Faturamento`, `Despesa`, `Descrição` e `Lucro`.
@@ -370,7 +379,7 @@ def consultar_modelo(chain, entrada: str) -> str:
 # Interface Streamlit      #
 ###########################
 
-def desenhar_sidebar(chain) -> None:
+def desenhar_sidebar(llm: ChatGroq) -> None:
     with st.sidebar:
         st.image(LOGO_PATH, width=300)
         abas = st.tabs(["Conversas", "Configurações"])
@@ -386,13 +395,13 @@ def desenhar_sidebar(chain) -> None:
                 f"""
                 - **Modelo:** {MODEL_NAME}
                 - **Usuário autorizado:** Elielcio ({CLIENT_NAME})
-                - **Linhas CSV:** {len(dados_df)}
+                - **Linhas CSV:** {len(dados_df_completo)}
                 - **Certidões disponíveis:** {', '.join(CERTIDOES) or 'nenhuma'}
                 """
             )
             if CONTABIL_API_URL:
                 if st.button("📤 Enviar para Contabilidade"):
-                    if enviar_contabilidade(dados_df):
+                    if enviar_contabilidade(dados_df_completo):
                         st.success("Enviado com sucesso!")
                     else:
                         st.error("Falha no envio. Verifique os logs.")
@@ -400,52 +409,75 @@ def desenhar_sidebar(chain) -> None:
                 st.info("Integração contábil não configurada.")
 
 
-def pagina_chat(chain) -> None:
+def pagina_chat(llm: ChatGroq) -> None:
     st.header(f"📊 Dashboard Financeiro - {CLIENT_NAME}")
+
+    # ─── Filtro Global de Datas ────────────────────────────────────────────────
+    datas_validas = dados_df_completo["data"].dropna() if not dados_df_completo.empty and "data" in dados_df_completo.columns else pd.Series()
+
+    if datas_validas.empty:
+        st.warning("Nenhuma data válida encontrada no CSV.")
+        return
+
+    min_date = datas_validas.min().to_pydatetime().date()
+    max_date = datas_validas.max().to_pydatetime().date()
+
+    st.subheader("📅 Filtro de Período")
+    c1, c2 = st.columns(2)
+    data_inicio = c1.date_input("Data inicial", min_date, min_value=min_date, max_value=max_date)
+    data_fim    = c2.date_input("Data final",   max_date, min_value=min_date, max_value=max_date)
+
+    if data_inicio > data_fim:
+        st.warning("A data inicial não pode ser posterior à data final.")
+        return
+
+    # Converte para datetime para uso nos filtros
+    dt_inicio = datetime.combine(data_inicio, datetime.min.time())
+    dt_fim    = datetime.combine(data_fim,    datetime.max.time())
+
+    # DataFrame filtrado — alimenta TUDO a partir daqui
+    dados_df = filtrar_por_periodo(dados_df_completo, dt_inicio, dt_fim)
+
+    if dados_df.empty:
+        st.info("Nenhum dado encontrado no período selecionado.")
+        return
+
+    # Recria a chain com o contexto do período filtrado
+    chain = _criar_chain(llm, dados_df, data_inicio, data_fim)
+
+    # ─── Métricas ──────────────────────────────────────────────────────────────
+    faturamento_total = dados_df["faturamento"].sum() if "faturamento" in dados_df.columns else 0.0
+    despesa_total     = dados_df["despesa"].sum()     if "despesa" in dados_df.columns else 0.0
+    lucro_total       = dados_df["lucro"].sum()       if "lucro" in dados_df.columns else 0.0
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Faturamento Total", f"R$ {faturamento_total:,.2f}")
     col2.metric("Despesa Total",     f"R$ {despesa_total:,.2f}")
     col3.metric("Lucro Total",       f"R$ {lucro_total:,.2f}")
 
-    if not dados_df.empty:
-        st.subheader("Top 10 Despesas")
-        fig = plot_despesas(dados_df)
-        if fig:
-            st.plotly_chart(fig, width='stretch')
-        else:
-            st.info("Nenhuma despesa registrada.")
+    # ─── Gráfico de Despesas ───────────────────────────────────────────────────
+    st.subheader("Top 10 Despesas")
+    fig_despesas = plot_despesas(dados_df)
+    if fig_despesas:
+        st.plotly_chart(fig_despesas, use_container_width=True)
+    else:
+        st.info("Nenhuma despesa registrada no período.")
 
     st.divider()
-    if not dados_df.empty and "data" in dados_df.columns:
-        st.subheader("📈 Análise Temporal")
-        datas_validas = dados_df["data"].dropna()
-        if datas_validas.empty:
-            st.warning("Nenhuma data válida no CSV.")
-        else:
-            min_date = datas_validas.min().to_pydatetime().date()
-            max_date = datas_validas.max().to_pydatetime().date()
-            c1, c2 = st.columns(2)
-            data_inicio = c1.date_input("Data inicial", min_date, min_value=min_date, max_value=max_date)
-            data_fim    = c2.date_input("Data final",   max_date, min_value=min_date, max_value=max_date)
 
-            if data_inicio > data_fim:
-                st.warning("A data inicial não pode ser posterior à data final.")
-            else:
-                fig_evol = plot_evolucao(
-                    dados_df,
-                    datetime.combine(data_inicio, datetime.min.time()),
-                    datetime.combine(data_fim,    datetime.max.time()),
-                )
-                if fig_evol:
-                    st.plotly_chart(fig_evol, width='stretch')
-                else:
-                    st.info("Sem dados no período selecionado.")
+    # ─── Gráfico de Evolução ───────────────────────────────────────────────────
+    st.subheader("📈 Evolução Financeira")
+    fig_evol = plot_evolucao(dados_df)
+    if fig_evol:
+        st.plotly_chart(fig_evol, use_container_width=True)
+    else:
+        st.info("Sem dados suficientes para o gráfico de evolução no período.")
 
     st.divider()
+
+    # ─── Chat ──────────────────────────────────────────────────────────────────
     st.subheader("💬 Conversa com o Analista")
 
-    # Exibir histórico
     for msg in get_historico():
         if isinstance(msg, HumanMessage):
             st.chat_message("human").markdown(msg.content)
@@ -505,11 +537,8 @@ def main() -> None:
 
     llm = _criar_client()
 
-    if "llm_chain" not in st.session_state:
-        st.session_state["llm_chain"] = _criar_chain(llm)
-
-    desenhar_sidebar(st.session_state["llm_chain"])
-    pagina_chat(st.session_state["llm_chain"])
+    desenhar_sidebar(llm)
+    pagina_chat(llm)
 
 
 if __name__ == "__main__":
