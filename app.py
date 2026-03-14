@@ -10,7 +10,7 @@ from typing import Tuple, Optional, Dict, Any, List
 
 import pandas as pd
 import streamlit as st
-import plotly.express as px
+import plotly.graph_objects as go
 import requests
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
@@ -20,20 +20,22 @@ from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 ########################
 # Configurações gerais #
 ########################
-BASE_PATH = Path(__file__).parent
-CSV_PATH = BASE_PATH / "dados.csv"
-CERT_PATH = BASE_PATH / "certidoes"
-LOGO_PATH = BASE_PATH / "logoo.png"
-CLIENT_NAME = "EJN SERVIÇOS"
-MODEL_NAME = "llama-3.3-70b-versatile"
+BASE_PATH    = Path(__file__).parent
+CSV_PATH     = BASE_PATH / "dados.csv"
+CERT_PATH    = BASE_PATH / "certidoes"
+LOGO_PATH    = BASE_PATH / "logoo.png"
+CLIENT_NAME  = "EJN SERVIÇOS"
+MODEL_NAME   = "llama-3.3-70b-versatile"
+
+# ── Limites ultra-enxutos ─────────────────────────────────────────────────────
+MAX_HISTORICO_MSGS = 6   # apenas as 6 últimas mensagens (3 trocas)
+# Não enviamos linhas brutas do CSV — apenas totais e resumos agregados
+# ─────────────────────────────────────────────────────────────────────────────
 
 load_dotenv()
-API_KEY = os.getenv("GROQ_API_KEY")
+API_KEY          = os.getenv("GROQ_API_KEY")
 CONTABIL_API_URL = os.getenv("CONTABIL_API_URL")
 
-#########################
-# Configuração do logger #
-#########################
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s — %(levelname)s — %(message)s",
@@ -41,216 +43,340 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ─── Tema Premium Dark ───────────────────────────────────────────────────────
+THEME_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+:root {
+    --bg-base:        #0a0d14;
+    --bg-surface:     #10141f;
+    --bg-card:        #141929;
+    --bg-card-hover:  #1a2035;
+    --border:         #1e2840;
+    --border-light:   #253050;
+    --accent-green:   #00e5a0;
+    --accent-blue:    #3b82f6;
+    --accent-red:     #f43f5e;
+    --accent-amber:   #f59e0b;
+    --text-primary:   #e8edf5;
+    --text-secondary: #7a8aaa;
+    --text-muted:     #3d4f6e;
+    --radius:         14px;
+    --shadow:         0 8px 32px rgba(0,0,0,0.45);
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: var(--bg-base) !important;
+    font-family: 'DM Sans', sans-serif !important;
+    color: var(--text-primary) !important;
+}
+[data-testid="stSidebar"] {
+    background: var(--bg-surface) !important;
+    border-right: 1px solid var(--border) !important;
+}
+.dash-header {
+    background: linear-gradient(135deg, #0d1526 0%, #111827 60%, #0d1a2e 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 36px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+.dash-header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(0,229,160,0.07) 0%, transparent 70%);
+    pointer-events: none;
+}
+.dash-header-title { font-family: 'Syne', sans-serif; font-size: 1.65rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; }
+.dash-header-sub   { font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px; font-weight: 300; }
+.dash-header-badge { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.25); color: var(--accent-green); font-size: 0.72rem; font-weight: 500; padding: 5px 14px; border-radius: 100px; letter-spacing: 0.06em; text-transform: uppercase; }
+.section-label { font-family: 'Syne', sans-serif; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; padding-left: 2px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+.kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; position: relative; overflow: hidden; transition: border-color 0.2s, transform 0.2s; cursor: default; }
+.kpi-card:hover { border-color: var(--border-light); transform: translateY(-2px); }
+.kpi-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+.kpi-card.green::after { background: linear-gradient(90deg, var(--accent-green), transparent); }
+.kpi-card.blue::after  { background: linear-gradient(90deg, var(--accent-blue),  transparent); }
+.kpi-card.red::after   { background: linear-gradient(90deg, var(--accent-red),   transparent); }
+.kpi-icon  { font-size: 1.3rem; margin-bottom: 12px; display: block; }
+.kpi-label { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; }
+.kpi-value { font-family: 'Syne', sans-serif; font-size: 1.65rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1; }
+.kpi-card.green .kpi-value { color: var(--accent-green); }
+.kpi-card.red   .kpi-value { color: var(--accent-red);   }
+.kpi-delta { font-size: 0.75rem; margin-top: 8px; color: var(--text-secondary); font-weight: 300; }
+.kpi-delta .up   { color: var(--accent-green); }
+.kpi-delta .down { color: var(--accent-red);   }
+.chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.chart-title    { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.chart-subtitle { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 18px; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.compare-period { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.compare-period-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; }
+.compare-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+.compare-row:last-child { border-bottom: none; }
+.compare-row-label { color: var(--text-secondary); }
+.compare-row-value { font-weight: 500; color: var(--text-primary); }
+.compare-row-value.up   { color: var(--accent-green); }
+.compare-row-value.down { color: var(--accent-red);   }
+[data-testid="stChatMessage"] { border-radius: 12px !important; padding: 14px 18px !important; margin: 6px 0 !important; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) { background: #1a2035 !important; border: 1px solid #253050 !important; }
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"])      { background: #0f1e38 !important; border: 1px solid #1e3a5f !important; }
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] li,
+[data-testid="stChatMessage"] strong,
+[data-testid="stChatMessage"] em { color: #e8edf5 !important; font-family: 'DM Sans', sans-serif !important; font-size: 0.92rem !important; line-height: 1.65 !important; }
+[data-testid="stChatMessage"] strong { color: #ffffff !important; font-weight: 600 !important; }
+section[data-testid="stBottom"] { background-color: #10141f !important; border-top: 1px solid #1e2840 !important; }
+textarea[data-testid="stChatInputTextArea"] { background-color: #10141f !important; color: #e8edf5 !important; caret-color: #00e5a0 !important; }
+div[data-baseweb="textarea"], div[data-baseweb="base-input"] { background-color: #10141f !important; border-color: #253050 !important; border-radius: 12px !important; }
+h1, h2, h3, h4 { font-family: 'Syne', sans-serif !important; color: var(--text-primary) !important; }
+div[data-testid="stTabs"] [data-testid="stTab"] { background: transparent !important; color: var(--text-secondary) !important; font-family: 'Syne', sans-serif !important; font-size: 0.8rem !important; letter-spacing: 0.07em !important; text-transform: uppercase !important; }
+div[data-testid="stTabs"] [aria-selected="true"] { color: var(--accent-green) !important; border-bottom: 2px solid var(--accent-green) !important; background: transparent !important; }
+.stButton > button { background: rgba(59,130,246,0.12) !important; border: 1px solid rgba(59,130,246,0.35) !important; color: var(--accent-blue) !important; border-radius: 9px !important; font-family: 'DM Sans', sans-serif !important; font-weight: 500 !important; transition: all 0.18s !important; }
+.stButton > button:hover { background: rgba(59,130,246,0.22) !important; border-color: var(--accent-blue) !important; }
+.stDownloadButton > button { background: rgba(0,229,160,0.1) !important; border: 1px solid rgba(0,229,160,0.3) !important; color: var(--accent-green) !important; border-radius: 9px !important; }
+[data-testid="stDecoration"] { display: none !important; }
+#MainMenu, footer, header { visibility: hidden !important; }
+hr { border-color: var(--border) !important; margin: 28px 0 !important; }
+[data-testid="stSidebar"] .stButton > button { width: 100%; background: rgba(30,40,64,0.8) !important; border-color: var(--border-light) !important; color: var(--text-secondary) !important; }
+[data-testid="stSidebar"] .stButton > button:hover { color: var(--text-primary) !important; border-color: var(--accent-blue) !important; background: rgba(59,130,246,0.1) !important; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
+</style>
+"""
+
+PLOT_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="DM Sans, sans-serif", color="#7a8aaa", size=12),
+    xaxis=dict(gridcolor="#1e2840", showgrid=True, zeroline=False, tickfont=dict(color="#7a8aaa")),
+    yaxis=dict(gridcolor="#1e2840", showgrid=True, zeroline=False, tickfont=dict(color="#7a8aaa")),
+    margin=dict(t=20, b=40, l=10, r=10),
+)
+
 ######################################
-# Index simples das certidões locais #
+# Certidões                          #
 ######################################
 
 def indexar_certidoes(pasta: Path) -> dict[str, Path]:
     index: dict[str, Path] = {}
     if pasta.exists():
-        for arquivo in pasta.glob("*.pdf"):
-            slug = (
-                arquivo.stem.lower()
-                .replace("_", " ")
-                .replace("-", " ")
-                .replace("  ", " ")
-                .strip()
-            )
-            slug_ascii = (
-                unicodedata.normalize("NFKD", slug)
-                .encode("ascii", "ignore")
-                .decode("ascii")
-            )
-            index[slug_ascii] = arquivo
+        for arq in pasta.glob("*.pdf"):
+            slug = unicodedata.normalize("NFKD", arq.stem.lower().replace("_"," ").replace("-"," ").strip()).encode("ascii","ignore").decode("ascii")
+            index[re.sub(r"\s+"," ", slug)] = arq
     return index
 
-
 CERTIDOES = indexar_certidoes(CERT_PATH)
-logger.info("Certidões indexadas: %s", list(CERTIDOES.keys()))
-
-###############################
-# Utilitários de normalização #
-###############################
 
 def normalizar_txt(txt: str) -> str:
-    ascii_txt = (
-        unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode("ascii")
-    )
-    ascii_txt = re.sub(r"[^a-z0-9 ]", " ", ascii_txt.lower())
-    ascii_txt = re.sub(r"\s+", " ", ascii_txt).strip()
-    return ascii_txt
+    s = unicodedata.normalize("NFKD", txt).encode("ascii","ignore").decode("ascii")
+    return re.sub(r"\s+"," ", re.sub(r"[^a-z0-9 ]"," ", s.lower())).strip()
 
-###############################
-# Funções utilitárias do CSV  #
-###############################
+######################################
+# CSV                                #
+######################################
 
 @st.cache_data(show_spinner=False)
 def carregar_df(caminho: Path) -> pd.DataFrame:
     try:
         df = pd.read_csv(caminho, sep=";", dtype=str)
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-
-        def _parse_money(txt: str) -> float:
-            if pd.isna(txt) or str(txt).strip() == "":
-                return 0.0
-            txt = str(txt).strip().replace("\u00A0", "")
-            txt = txt.replace(".", "").replace(",", ".")
-            try:
-                return float(txt)
-            except ValueError:
-                logger.warning("Valor monetário inválido ignorado: %r", txt)
-                return 0.0
-
-        for col in ("faturamento", "despesa", "lucro"):
-            if col in df.columns:
-                df[col] = df[col].apply(_parse_money)
-            else:
-                logger.warning("Coluna '%s' ausente no CSV.", col)
-                df[col] = 0.0
-
+        df.columns = [c.strip().lower().replace(" ","_") for c in df.columns]
+        def _money(txt):
+            if pd.isna(txt) or str(txt).strip() == "": return 0.0
+            try: return float(str(txt).strip().replace("\u00A0","").replace(".","").replace(",","."))
+            except: return 0.0
+        for col in ("faturamento","despesa","lucro"):
+            df[col] = df[col].apply(_money) if col in df.columns else 0.0
         if "data" in df.columns:
             df["data"] = pd.to_datetime(df["data"], dayfirst=True, errors="coerce")
-
-        datas_invalidas = df["data"].isna().sum()
-        if datas_invalidas:
-            logger.warning("%d linha(s) com datas inválidas foram ignoradas.", datas_invalidas)
-
         return df
     except FileNotFoundError:
-        logger.error("Arquivo CSV não encontrado: %s", caminho)
         return pd.DataFrame()
     except Exception as exc:
-        logger.exception("Erro ao carregar CSV: %s", exc)
-        return pd.DataFrame()
+        logger.exception("Erro CSV: %s", exc); return pd.DataFrame()
 
 
-def filtrar_por_periodo(df: pd.DataFrame, data_inicio: datetime, data_fim: datetime) -> pd.DataFrame:
-    """Retorna o DataFrame filtrado pelo período selecionado."""
-    if df.empty or "data" not in df.columns:
-        return df
-    return df[
-        (df["data"] >= pd.Timestamp(data_inicio))
-        & (df["data"] <= pd.Timestamp(data_fim))
+def filtrar_por_periodo(df, ini, fim):
+    if df.empty or "data" not in df.columns: return df
+    return df[(df["data"] >= pd.Timestamp(ini)) & (df["data"] <= pd.Timestamp(fim))]
+
+
+def _fmt_brl(v: float) -> str:
+    return f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+
+
+# ─── CONTEXTO ULTRA-ENXUTO: ~120–160 tokens no total ─────────────────────────
+def construir_contexto(df: pd.DataFrame) -> str:
+    """
+    Você fala sempre diretamente com o dono da EJN SERVIÇOS, dono da empresa EJN SERVIÇOS chama-se Elielcio.
+    Envia APENAS dados agregados — sem nenhuma linha bruta do CSV.
+    O modelo recebe o suficiente para responder perguntas financeiras e de Ciência de dados.
+    """
+    if df.empty:
+        return "Sem dados no período."
+
+    fat   = df["faturamento"].sum()
+    desp  = df["despesa"].sum()
+    lucro = df["lucro"].sum()
+    margem = (lucro / fat * 100) if fat > 0 else 0.0
+
+    partes = [
+        f"Totais: Fat={_fmt_brl(fat)} Desp={_fmt_brl(desp)} Lucro={_fmt_brl(lucro)} Margem={margem:.1f}%"
     ]
 
+    # Resumo mensal — máx 6 meses mais recentes
+    if "data" in df.columns:
+        df2 = df.copy()
+        df2["m"] = df2["data"].dt.to_period("M").astype(str)
+        agg = df2.groupby("m")[["faturamento","despesa","lucro"]].sum().tail(6)
+        linhas_mes = [f"{m}: fat={_fmt_brl(r.faturamento)} desp={_fmt_brl(r.despesa)} lucro={_fmt_brl(r.lucro)}" for m, r in agg.iterrows()]
+        partes.append("Mensal: " + " | ".join(linhas_mes))
 
-def df_para_prompt(df: pd.DataFrame) -> str:
-    if df.empty:
-        return "Nenhum dado disponível."
-    df_display = df.copy()
-    for col in ("faturamento", "despesa", "lucro"):
-        if col in df_display.columns:
-            df_display[col] = df_display[col].apply(
-                lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            )
-    MAX_LINHAS_PROMPT = 200
-    if len(df_display) > MAX_LINHAS_PROMPT:
-        logger.info("DataFrame truncado para %d linhas no prompt.", MAX_LINHAS_PROMPT)
-        df_display = df_display.tail(MAX_LINHAS_PROMPT)
-    return df_display.to_csv(index=False, sep=";")
+    # Top 3 categorias de despesa
+    if "descricao" in df.columns and desp > 0:
+        top3 = df[df["despesa"] > 0].groupby("descricao")["despesa"].sum().nlargest(3)
+        partes.append("Top3Desp: " + " | ".join(f"{k}={_fmt_brl(v)}" for k, v in top3.items()))
+
+    return "\n".join(partes)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
-# DataFrame completo (sem filtro) — usado apenas para definir os limites do date_input
 dados_df_completo = carregar_df(CSV_PATH)
 
 ##############################
-# Análise Financeira Avançada #
+# Análise para gráficos      #
 ##############################
 
-def analisar_financas(df: pd.DataFrame) -> Dict[str, Any]:
+def analisar_financas(df):
     if df.empty:
-        return {
-            "top_despesas": pd.DataFrame(),
-            "faturamento_medio_diario": 0.0,
-            "margem_lucro": 0.0,
-            "despesas_recorrentes": pd.Series(),
-        }
+        return {"top_despesas": pd.DataFrame(), "faturamento_medio_diario": 0.0,
+                "margem_lucro": 0.0, "despesas_recorrentes": pd.Series()}
+    top      = df.nlargest(5,"despesa")[["descricao","despesa"]] if "descricao" in df.columns else pd.DataFrame()
+    fat_med  = df[df["faturamento"]>0]["faturamento"].mean() or 0.0
+    margem   = (df["lucro"].sum()/df["faturamento"].sum()*100) if df["faturamento"].sum()>0 else 0.0
+    desp_rec = df[df["despesa"]>0].groupby("descricao")["despesa"].sum().nlargest(5) if "descricao" in df.columns else pd.Series()
+    return {"top_despesas": top, "faturamento_medio_diario": fat_med,
+            "margem_lucro": margem, "despesas_recorrentes": desp_rec}
 
-    top_despesas = df.nlargest(5, "despesa")[["descricao", "despesa"]] if "descricao" in df.columns else pd.DataFrame()
-    faturamento_medio_diario = df[df["faturamento"] > 0]["faturamento"].mean() if not df.empty else 0.0
-    margem_lucro = (df["lucro"].sum() / df["faturamento"].sum() * 100) if df["faturamento"].sum() > 0 else 0.0
-    despesas_recorrentes = (
-        df[df["despesa"] > 0].groupby("descricao")["despesa"].sum().nlargest(5)
-        if "descricao" in df.columns else pd.Series()
-    )
 
-    return {
-        "top_despesas": top_despesas,
-        "faturamento_medio_diario": faturamento_medio_diario,
-        "margem_lucro": margem_lucro,
-        "despesas_recorrentes": despesas_recorrentes,
-    }
+def comparar_periodos(df_a, df_b):
+    def t(df):
+        return {"faturamento": df["faturamento"].sum() if not df.empty else 0.0,
+                "despesa":     df["despesa"].sum()     if not df.empty else 0.0,
+                "lucro":       df["lucro"].sum()        if not df.empty else 0.0}
+    a, b = t(df_a), t(df_b)
+    delta = {k: ((a[k]-b[k])/b[k]*100) if b[k]!=0 else 0.0 for k in a}
+    return {"periodo_a": a, "periodo_b": b, "delta": delta}
 
-############################
-# Visualizações de Dados   #
-############################
+##############################
+# Gráficos                   #
+##############################
 
-def plot_despesas(df: pd.DataFrame):
-    if df.empty or "descricao" not in df.columns:
-        return None
-    despesas_agrupadas = (
-        df[df["despesa"] > 0].groupby("descricao")["despesa"].sum().nlargest(10)
-    )
-    if despesas_agrupadas.empty:
-        return None
-    despesas_df = despesas_agrupadas.reset_index()
-    despesas_df.columns = ["descricao", "valor_total"]
-    fig = px.pie(
-        despesas_df, names="descricao", values="valor_total",
-        title="Top 10 Despesas (Valor Total)", hole=0.3,
-    )
-    fig.update_traces(
-        textposition="inside", textinfo="percent+label",
-        hovertemplate="<b>%{label}</b><br>R$ %{value:,.2f} (%{percent})",
-    )
-    fig.update_layout(uniformtext_minsize=12, uniformtext_mode="hide",
-                      margin=dict(t=50, b=20, l=20, r=20))
+def plot_despesas_donut(df):
+    if df.empty or "descricao" not in df.columns: return None
+    ag = df[df["despesa"]>0].groupby("descricao")["despesa"].sum().nlargest(10)
+    if ag.empty: return None
+    d = ag.reset_index(); d.columns = ["descricao","valor"]
+    COLORS = ["#00e5a0","#3b82f6","#f59e0b","#f43f5e","#a78bfa","#22d3ee","#fb923c","#4ade80","#e879f9","#94a3b8"]
+    fig = go.Figure(go.Pie(
+        labels=d["descricao"], values=d["valor"], hole=0.62,
+        marker=dict(colors=COLORS[:len(d)], line=dict(color="#0a0d14", width=2)),
+        textposition="outside", textfont=dict(size=11, color="#7a8aaa"),
+        hovertemplate="<b>%{label}</b><br>%{customdata}<br>%{percent}<extra></extra>",
+        customdata=[_fmt_brl(v) for v in d["valor"]],
+    ))
+    fig.update_layout(**PLOT_LAYOUT, showlegend=True,
+        legend=dict(orientation="v", x=1.02, y=0.5, bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font=dict(size=11, color="#7a8aaa")),
+        annotations=[dict(text="Despesas", x=0.5, y=0.5, font_size=13, font_color="#e8edf5", font_family="Syne, sans-serif", showarrow=False)],
+        height=360)
     return fig
 
 
-def plot_evolucao(df: pd.DataFrame):
-    """Plota a evolução financeira do DataFrame já filtrado."""
-    if df.empty or "data" not in df.columns:
-        return None
-    df_agrupado = df.groupby("data")[["faturamento", "despesa", "lucro"]].sum().reset_index()
-    if df_agrupado.empty:
-        return None
-    fig = px.line(
-        df_agrupado,
-        x="data",
-        y=["faturamento", "despesa", "lucro"],
-        title="Evolução Financeira no Período",
-        labels={"value": "Valor (R$)", "variable": "Indicador"},
-        color_discrete_map={"faturamento": "#2ecc71", "despesa": "#e74c3c", "lucro": "#3498db"},
-    )
-    fig.update_layout(hovermode="x unified", legend_title_text="",
-                      xaxis_title="Data", yaxis_title="Valor (R$)",
-                      margin=dict(t=50, b=50, l=50, r=50))
-    fig.update_traces(hovertemplate="<b>%{y:,.2f}</b>", mode="lines+markers")
+def plot_evolucao_area(df):
+    if df.empty or "data" not in df.columns: return None
+    ag = df.groupby("data")[["faturamento","despesa","lucro"]].sum().reset_index()
+    if ag.empty: return None
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=ag["data"], y=ag["faturamento"], name="Faturamento", fill="tozeroy", mode="lines", line=dict(color="#00e5a0", width=2), fillcolor="rgba(0,229,160,0.07)", hovertemplate="<b>%{x|%d/%m/%y}</b><br>Fat: R$ %{y:,.2f}<extra></extra>"))
+    fig.add_trace(go.Scatter(x=ag["data"], y=ag["despesa"],     name="Despesa",     fill="tozeroy", mode="lines", line=dict(color="#f43f5e", width=2), fillcolor="rgba(244,63,94,0.07)",  hovertemplate="<b>%{x|%d/%m/%y}</b><br>Desp: R$ %{y:,.2f}<extra></extra>"))
+    fig.add_trace(go.Scatter(x=ag["data"], y=ag["lucro"],       name="Lucro",       mode="lines+markers", line=dict(color="#3b82f6", width=2.5, dash="dot"), marker=dict(size=5, color="#3b82f6"), hovertemplate="<b>%{x|%d/%m/%y}</b><br>Lucro: R$ %{y:,.2f}<extra></extra>"))
+    fig.update_layout(**PLOT_LAYOUT, hovermode="x unified", height=340,
+        legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font=dict(size=11, color="#7a8aaa")))
     return fig
 
-###################################
-# Histórico de mensagens          #
-###################################
+
+def plot_barras_mensais(df):
+    if df.empty or "data" not in df.columns: return None
+    import numpy as np
+    df2 = df.copy(); df2["mes"] = df2["data"].dt.to_period("M").astype(str)
+    ag = df2.groupby("mes")[["faturamento","despesa","lucro"]].sum().reset_index()
+    if len(ag) < 2: return None
+    cd = np.stack([ag["faturamento"].values, ag["despesa"].values, ag["lucro"].values], axis=1)
+    ht = "<b>%{x}</b><br>Fat: R$ %{customdata[0]:,.2f}<br>Desp: R$ %{customdata[1]:,.2f}<br>Lucro: R$ %{customdata[2]:,.2f}<extra></extra>"
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=ag["mes"], y=ag["faturamento"], name="Faturamento", marker_color="rgba(0,229,160,0.75)",  customdata=cd, hovertemplate=ht))
+    fig.add_trace(go.Bar(x=ag["mes"], y=ag["despesa"],     name="Despesa",     marker_color="rgba(244,63,94,0.65)", customdata=cd, hovertemplate=ht))
+    fig.add_trace(go.Scatter(x=ag["mes"], y=ag["lucro"],   name="Lucro",       mode="lines+markers", line=dict(color="#3b82f6", width=2), marker=dict(size=6), yaxis="y2", customdata=cd, hovertemplate=ht))
+    fig.update_layout(**PLOT_LAYOUT, barmode="group", height=330, hovermode="closest",
+        yaxis2=dict(overlaying="y", side="right", showgrid=False, tickfont=dict(color="#3b82f6"), zeroline=False),
+        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font=dict(size=11, color="#7a8aaa")))
+    return fig
+
+
+def plot_waterfall_lucro(df):
+    if df.empty: return None
+    fat=df["faturamento"].sum(); desp=df["despesa"].sum(); lucro=df["lucro"].sum()
+    fig = go.Figure(go.Waterfall(
+        orientation="v", measure=["absolute","relative","total"],
+        x=["Faturamento","Despesas","Lucro Líquido"], y=[fat,-desp,lucro],
+        connector=dict(line=dict(color="#1e2840", width=1.5)),
+        increasing=dict(marker_color="#00e5a0"), decreasing=dict(marker_color="#f43f5e"), totals=dict(marker_color="#3b82f6"),
+        text=[_fmt_brl(fat), f"−{_fmt_brl(desp)}", _fmt_brl(lucro)],
+        textposition="outside", textfont=dict(color="#e8edf5", size=11),
+        hovertemplate="<b>%{x}</b><br>R$ %{y:,.2f}<extra></extra>",
+    ))
+    fig.update_layout(**PLOT_LAYOUT, height=300, legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)"))
+    return fig
+
+
+def plot_comparativo_barras(comp):
+    a=comp["periodo_a"]; b=comp["periodo_b"]
+    cats=["Faturamento","Despesa","Lucro"]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name="Período A", x=cats, y=[a["faturamento"],a["despesa"],a["lucro"]], marker_color="rgba(59,130,246,0.75)", hovertemplate="%{x}: R$ %{y:,.2f}<extra>Período A</extra>"))
+    fig.add_trace(go.Bar(name="Período B", x=cats, y=[b["faturamento"],b["despesa"],b["lucro"]], marker_color="rgba(0,229,160,0.6)",   hovertemplate="%{x}: R$ %{y:,.2f}<extra>Período B</extra>"))
+    fig.update_layout(**PLOT_LAYOUT, barmode="group", height=290,
+        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font=dict(size=11, color="#7a8aaa")))
+    return fig
+
+##############################
+# Histórico                  #
+##############################
 
 def get_historico() -> List[BaseMessage]:
     return st.session_state.setdefault("historico", [])
 
-
 def adicionar_mensagem(role: str, conteudo: str) -> None:
-    historico = get_historico()
-    msg = HumanMessage(content=conteudo) if role == "human" else AIMessage(content=conteudo)
-    historico.append(msg)
-    if len(historico) > 40:
-        st.session_state["historico"] = historico[-40:]
-
+    h = get_historico()
+    h.append(HumanMessage(content=conteudo) if role == "human" else AIMessage(content=conteudo))
+    if len(h) > MAX_HISTORICO_MSGS:
+        st.session_state["historico"] = h[-MAX_HISTORICO_MSGS:]
 
 def limpar_historico() -> None:
     st.session_state["historico"] = []
 
-###################################
-# Configuração do modelo (Groq)   #
-###################################
+##############################
+# LLM                        #
+##############################
 
 @st.cache_resource
 def _criar_client() -> ChatGroq:
@@ -258,75 +384,56 @@ def _criar_client() -> ChatGroq:
 
 
 def _criar_chain(llm: ChatGroq, df_filtrado: pd.DataFrame, data_inicio, data_fim):
-    """Cria a chain com contexto do período filtrado."""
-    faturamento = df_filtrado["faturamento"].sum() if not df_filtrado.empty and "faturamento" in df_filtrado.columns else 0.0
-    despesa     = df_filtrado["despesa"].sum()     if not df_filtrado.empty and "despesa" in df_filtrado.columns else 0.0
-    lucro       = df_filtrado["lucro"].sum()       if not df_filtrado.empty and "lucro" in df_filtrado.columns else 0.0
-    analise     = analisar_financas(df_filtrado)
-
     periodo_str = f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
 
-    system_message = f"""
-Você é Victor, assistente virtual da empresa de construção civil \"{CLIENT_NAME}\" do Elielcio.
-Fale **sempre** em português brasileiro, de forma clara e objetiva.
-Ignore qualquer texto entre as tags <think> e </think>; trate-o como nota interna.
-Você interage exclusivamente com o Elielcio, dono da empresa EJN SERVIÇOS.
+    # ── System prompt mínimo — estimativa: ~150–200 tokens ───────────────────
+    system_message = (
+        f"Você é Victor, assistente financeiro da empresa {CLIENT_NAME}. "
+        f"Responda SOMENTE com base nos dados abaixo. Português. Respostas curtas e diretas.\n\n"
+        f"Período: {periodo_str}\n"
+        f"{construir_contexto(df_filtrado)}\n\n"
+        f"Certidões disponíveis: {', '.join(CERTIDOES.keys()) or 'nenhuma'}"
+    )
+    # ─────────────────────────────────────────────────────────────────────────
 
-**DIRETRIZES DE RESPOSTA:**
-1. Seja conciso. Evite textos longos quando a pergunta for simples.
-2. Para perguntas objetivas, responda em no máximo 2 frases.
-3. Para perguntas sobre valores financeiros, mostre apenas os números relevantes.
-4. Para pedidos de certidões, forneça imediatamente o link de download.
-5. Use negrito apenas para valores numéricos importantes.
-
-**Resumo financeiro do período {periodo_str}**:
-- **Faturamento acumulado:** R$ {faturamento:,.2f}
-- **Despesa acumulada:** R$ {despesa:,.2f}
-- **Lucro acumulado:** R$ {lucro:,.2f}
-
-**Análise detalhada**:
-- **Top 5 despesas**:
-{analise['top_despesas'].to_string(index=False) if not analise['top_despesas'].empty else 'Nenhuma despesa registrada'}
-- **Faturamento médio diário**: R$ {analise['faturamento_medio_diario']:,.2f}
-- **Margem de lucro**: {analise['margem_lucro']:.2f}%
-- **Principais despesas recorrentes**:
-{analise['despesas_recorrentes'].to_string() if not analise['despesas_recorrentes'].empty else 'Nenhuma despesa recorrente'}
-
-Certidões disponíveis: {', '.join(CERTIDOES.keys()) or 'nenhuma'}
-
-Base de dados detalhada (período {periodo_str}):
-###
-{df_para_prompt(df_filtrado)}
-###
-
-- As colunas correspondem a `Data`, `Faturamento`, `Despesa`, `Descrição` e `Lucro`.
-- Todos os valores estão em Reais (BRL).
-
-Se precisar de uma certidão, basta pedir — exemplos: "quero a CND estadual", "quero a CND FGTS".
-
-Termine perguntando se precisa de algo mais.
-"""
-    prompt_template = ChatPromptTemplate.from_messages([
+    prompt = ChatPromptTemplate.from_messages([
         ("system", system_message),
         ("placeholder", "{chat_history}"),
         ("user", "{input}"),
     ])
-    return prompt_template | llm
+    return prompt | llm
 
-#######################################
-# Certidões PDF                        #
-#######################################
+
+def consultar_modelo(chain, entrada: str) -> str:
+    try:
+        response = chain.invoke({"input": entrada, "chat_history": get_historico()})
+
+        # ── Salva contagem de tokens para exibir na sidebar ───────────────────
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            uso = response.usage_metadata
+            st.session_state["ultimo_uso_tokens"] = {
+                "entrada": uso.get("input_tokens", 0),
+                "saida":   uso.get("output_tokens", 0),
+                "total":   uso.get("total_tokens", 0),
+            }
+
+        return response.content
+    except Exception as exc:
+        logger.exception("Erro LLM: %s", exc)
+        return "❌ Ocorreu um erro. Tente novamente."
+
+##############################
+# Certidões                  #
+##############################
 
 CATEGORIAS_CERT = {
     "estadual": "Estadual", "federal": "Federal",
     "municipal": "Municipal", "fgts": "FGTS", "fiscal": "Fiscal",
 }
 
-
 def tentar_enviar_certidao(mensagem: str) -> Tuple[Optional[Path], Optional[str]]:
     txt = normalizar_txt(mensagem)
-    if "cnd" not in txt and "certidao" not in txt:
-        return None, None
+    if "cnd" not in txt and "certidao" not in txt: return None, None
     for cat_slug, cat_nome in CATEGORIAS_CERT.items():
         if cat_slug in txt:
             for slug, path in CERTIDOES.items():
@@ -334,212 +441,313 @@ def tentar_enviar_certidao(mensagem: str) -> Tuple[Optional[Path], Optional[str]
                     return path, cat_nome
     return None, None
 
-################################
-# Contabilidade                 #
-################################
+##############################
+# Contabilidade               #
+##############################
 
 def enviar_contabilidade(df: pd.DataFrame) -> bool:
-    if not CONTABIL_API_URL:
-        logger.warning("URL da API contábil não configurada.")
-        return False
+    if not CONTABIL_API_URL: return False
     try:
-        dados_json = df.assign(
-            data=df["data"].dt.strftime("%Y-%m-%d").fillna("")
-        ).to_dict(orient="records")
-        response = requests.post(CONTABIL_API_URL, json=dados_json, timeout=10)
-        if response.status_code == 200:
-            logger.info("Dados enviados para contabilidade com sucesso.")
-            return True
-        logger.error("Erro ao enviar: status=%s body=%s", response.status_code, response.text)
-        return False
-    except requests.exceptions.Timeout:
-        logger.error("Timeout ao enviar dados para contabilidade.")
-        return False
+        r = requests.post(CONTABIL_API_URL,
+                          json=df.assign(data=df["data"].dt.strftime("%Y-%m-%d").fillna("")).to_dict(orient="records"),
+                          timeout=10)
+        return r.status_code == 200
     except Exception as exc:
-        logger.exception("Erro na integração contábil: %s", exc)
-        return False
+        logger.exception("Erro contábil: %s", exc); return False
 
-###########################
-# LLM                      #
-###########################
+##############################
+# Helpers UI                 #
+##############################
 
-def consultar_modelo(chain, entrada: str) -> str:
-    try:
-        historico = get_historico()
-        resposta = chain.invoke({
-            "input": entrada,
-            "chat_history": historico,
-        }).content
-        return resposta
-    except Exception as exc:
-        logger.exception("Erro na chamada do LLM: %s", exc)
-        return "❌ Ocorreu um erro. Tente novamente."
+def fmt_brl(v: float) -> str:
+    return f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
 
-###########################
-# Interface Streamlit      #
-###########################
+def delta_html(pct: float) -> str:
+    if pct > 0:  return f'<span class="up">▲ {pct:.1f}%</span>'
+    if pct < 0:  return f'<span class="down">▼ {abs(pct):.1f}%</span>'
+    return '<span>— 0%</span>'
+
+##############################
+# Sidebar                    #
+##############################
 
 def desenhar_sidebar(llm: ChatGroq) -> None:
     with st.sidebar:
-        st.image(LOGO_PATH, width=300)
-        abas = st.tabs(["Conversas", "Configurações"])
+        if LOGO_PATH.exists():
+            st.image(str(LOGO_PATH), width=260)
+        else:
+            st.markdown(
+                f'<div style="font-family:Syne,sans-serif;font-size:1.2rem;font-weight:800;color:#e8edf5;padding:16px 0 8px">{CLIENT_NAME}</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Navegação</div>', unsafe_allow_html=True)
+        abas = st.tabs(["💬 Chat", "⚙️ Config"])
 
         with abas[0]:
-            if st.button("🗑️ Apagar Histórico", use_container_width=True):
-                limpar_historico()
-                st.success("Histórico apagado!")
+            st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+            if st.button("🗑️ Limpar Histórico", use_container_width=True):
+                limpar_historico(); st.success("Histórico limpo.")
+
+            st.markdown(
+                f'<div style="margin-top:16px;font-size:0.75rem;color:#3d4f6e;line-height:1.8">'
+                f'Modelo: <span style="color:#7a8aaa">{MODEL_NAME}</span><br>'
+                f'Linhas CSV: <span style="color:#7a8aaa">{len(dados_df_completo)}</span><br>'
+                f'Histórico: <span style="color:#7a8aaa">máx. {MAX_HISTORICO_MSGS} msgs</span><br>'
+                f'Contexto: <span style="color:#7a8aaa">apenas agregados</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # ── Contador de tokens em tempo real ─────────────────────────────
+            uso = st.session_state.get("ultimo_uso_tokens")
+            if uso:
+                st.markdown(
+                    f'<div style="margin-top:16px;font-size:0.75rem;color:#3d4f6e;'
+                    f'line-height:1.9;border-top:1px solid #1e2840;padding-top:12px">'
+                    f'<span style="color:#7a8aaa;font-weight:600">Última chamada</span><br>'
+                    f'↑ Enviado:&nbsp; <span style="color:#f59e0b">{uso["entrada"]:,} tokens</span><br>'
+                    f'↓ Recebido: <span style="color:#00e5a0">{uso["saida"]:,} tokens</span><br>'
+                    f'∑ Total:&nbsp;&nbsp;&nbsp; <span style="color:#e8edf5">{uso["total"]:,} tokens</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
         with abas[1]:
-            st.header("⚙️ Configurações")
-            st.markdown(
-                f"""
-                - **Modelo:** {MODEL_NAME}
-                - **Usuário autorizado:** Elielcio ({CLIENT_NAME})
-                - **Linhas CSV:** {len(dados_df_completo)}
-                - **Certidões disponíveis:** {', '.join(CERTIDOES) or 'nenhuma'}
-                """
-            )
+            st.markdown('<div class="section-label" style="margin-top:12px">Integração</div>', unsafe_allow_html=True)
             if CONTABIL_API_URL:
-                if st.button("📤 Enviar para Contabilidade"):
-                    if enviar_contabilidade(dados_df_completo):
-                        st.success("Enviado com sucesso!")
-                    else:
-                        st.error("Falha no envio. Verifique os logs.")
+                if st.button("📤 Enviar para Contabilidade", use_container_width=True):
+                    ok = enviar_contabilidade(dados_df_completo)
+                    st.success("Enviado!") if ok else st.error("Falha no envio.")
             else:
-                st.info("Integração contábil não configurada.")
+                st.caption("Integração contábil não configurada.")
 
+            st.markdown('<div class="section-label" style="margin-top:20px">Certidões</div>', unsafe_allow_html=True)
+            if CERTIDOES:
+                for nome, path in CERTIDOES.items():
+                    with open(path,"rb") as f:
+                        st.download_button(label=f"📄 {nome.title()}", data=f.read(),
+                                           file_name=path.name, mime="application/pdf",
+                                           use_container_width=True)
+            else:
+                st.caption("Nenhuma certidão disponível.")
+
+##############################
+# Página Principal           #
+##############################
 
 def pagina_chat(llm: ChatGroq) -> None:
-    st.header(f"📊 Dashboard Financeiro - {CLIENT_NAME}")
+    hoje = datetime.now().strftime("%d/%m/%Y")
+    st.markdown(
+        f'<div class="dash-header">'
+        f'<div><div class="dash-header-title">📊 Dashboard Financeiro</div>'
+        f'<div class="dash-header-sub">{CLIENT_NAME} · Atualizado em {hoje}</div></div>'
+        f'<div class="dash-header-badge">● Online</div></div>',
+        unsafe_allow_html=True,
+    )
 
-    # ─── Filtro Global de Datas ────────────────────────────────────────────────
-    datas_validas = dados_df_completo["data"].dropna() if not dados_df_completo.empty and "data" in dados_df_completo.columns else pd.Series()
-
+    datas_validas = (dados_df_completo["data"].dropna()
+                     if not dados_df_completo.empty and "data" in dados_df_completo.columns
+                     else pd.Series())
     if datas_validas.empty:
-        st.warning("Nenhuma data válida encontrada no CSV.")
-        return
+        st.warning("Nenhuma data válida no CSV."); return
 
     min_date = datas_validas.min().to_pydatetime().date()
     max_date = datas_validas.max().to_pydatetime().date()
 
-    st.subheader("📅 Filtro de Período")
-    c1, c2 = st.columns(2)
-    data_inicio = c1.date_input("Data inicial", min_date, min_value=min_date, max_value=max_date)
-    data_fim    = c2.date_input("Data final",   max_date, min_value=min_date, max_value=max_date)
+    tab_visao, tab_comparativo, tab_chat = st.tabs(["  Visão Geral  ", "  Comparativo  ", "  Analista IA  "])
 
-    if data_inicio > data_fim:
-        st.warning("A data inicial não pode ser posterior à data final.")
-        return
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 1 — VISÃO GERAL
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab_visao:
+        st.markdown('<div class="section-label" style="margin-top:16px">Filtro de Período</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        data_inicio = c1.date_input("De",  min_date, min_value=min_date, max_value=max_date, key="vi_ini")
+        data_fim    = c2.date_input("Até", max_date, min_value=min_date, max_value=max_date, key="vi_fim")
 
-    # Converte para datetime para uso nos filtros
-    dt_inicio = datetime.combine(data_inicio, datetime.min.time())
-    dt_fim    = datetime.combine(data_fim,    datetime.max.time())
+        if data_inicio > data_fim:
+            st.warning("Data inicial posterior à data final."); return
 
-    # DataFrame filtrado — alimenta TUDO a partir daqui
-    dados_df = filtrar_por_periodo(dados_df_completo, dt_inicio, dt_fim)
+        dados_df = filtrar_por_periodo(dados_df_completo,
+                                       datetime.combine(data_inicio, datetime.min.time()),
+                                       datetime.combine(data_fim,    datetime.max.time()))
+        if dados_df.empty:
+            st.info("Nenhum dado no período."); return
 
-    if dados_df.empty:
-        st.info("Nenhum dado encontrado no período selecionado.")
-        return
+        fat   = dados_df["faturamento"].sum()
+        desp  = dados_df["despesa"].sum()
+        lucro = dados_df["lucro"].sum()
+        margem = (lucro/fat*100) if fat > 0 else 0.0
 
-    # Recria a chain com o contexto do período filtrado
-    chain = _criar_chain(llm, dados_df, data_inicio, data_fim)
+        st.markdown('<div class="section-label" style="margin-top:20px">Indicadores</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="kpi-grid">'
+            f'<div class="kpi-card green"><span class="kpi-icon">💰</span><div class="kpi-label">Faturamento Total</div><div class="kpi-value">{fmt_brl(fat)}</div><div class="kpi-delta">Período selecionado</div></div>'
+            f'<div class="kpi-card red"><span class="kpi-icon">📉</span><div class="kpi-label">Despesa Total</div><div class="kpi-value">{fmt_brl(desp)}</div><div class="kpi-delta">Período selecionado</div></div>'
+            f'<div class="kpi-card blue"><span class="kpi-icon">📈</span><div class="kpi-label">Lucro Líquido</div><div class="kpi-value">{fmt_brl(lucro)}</div><div class="kpi-delta">Margem: <b>{margem:.1f}%</b></div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-    # ─── Métricas ──────────────────────────────────────────────────────────────
-    faturamento_total = dados_df["faturamento"].sum() if "faturamento" in dados_df.columns else 0.0
-    despesa_total     = dados_df["despesa"].sum()     if "despesa" in dados_df.columns else 0.0
-    lucro_total       = dados_df["lucro"].sum()       if "lucro" in dados_df.columns else 0.0
+        st.markdown('<div class="chart-card"><div class="chart-title">Resumo Financeiro</div><div class="chart-subtitle">Fluxo de Faturamento → Lucro Líquido</div>', unsafe_allow_html=True)
+        fig_wf = plot_waterfall_lucro(dados_df)
+        if fig_wf: st.plotly_chart(fig_wf, width="stretch", config={"displayModeBar": False}, key="chart_waterfall")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Faturamento Total", f"R$ {faturamento_total:,.2f}")
-    col2.metric("Despesa Total",     f"R$ {despesa_total:,.2f}")
-    col3.metric("Lucro Total",       f"R$ {lucro_total:,.2f}")
+        col_g1, col_g2 = st.columns([3, 2])
+        with col_g1:
+            st.markdown('<div class="chart-card"><div class="chart-title">Evolução no Período</div><div class="chart-subtitle">Faturamento · Despesa · Lucro ao longo do tempo</div>', unsafe_allow_html=True)
+            fig_ev = plot_evolucao_area(dados_df)
+            if fig_ev: st.plotly_chart(fig_ev, width="stretch", config={"displayModeBar": False}, key="chart_evolucao")
+            else: st.info("Dados insuficientes.")
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col_g2:
+            st.markdown('<div class="chart-card"><div class="chart-title">Top 10 Despesas</div><div class="chart-subtitle">Distribuição por categoria</div>', unsafe_allow_html=True)
+            fig_do = plot_despesas_donut(dados_df)
+            if fig_do: st.plotly_chart(fig_do, width="stretch", config={"displayModeBar": False}, key="chart_donut")
+            else: st.info("Sem despesas.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # ─── Gráfico de Despesas ───────────────────────────────────────────────────
-    st.subheader("Top 10 Despesas")
-    fig_despesas = plot_despesas(dados_df)
-    if fig_despesas:
-        st.plotly_chart(fig_despesas, use_container_width=True)
-    else:
-        st.info("Nenhuma despesa registrada no período.")
+        st.markdown('<div class="chart-card"><div class="chart-title">Consolidado Mensal</div><div class="chart-subtitle">Barras agrupadas + linha de lucro (eixo secundário)</div>', unsafe_allow_html=True)
+        fig_bar = plot_barras_mensais(dados_df)
+        if fig_bar: st.plotly_chart(fig_bar, width="stretch", config={"displayModeBar": False}, key="chart_barras_mensais")
+        else: st.info("São necessários pelo menos 2 meses de dados.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.divider()
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 2 — COMPARATIVO
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab_comparativo:
+        st.markdown('<div class="section-label" style="margin-top:16px">Comparativo Entre Períodos</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Período A**")
+            ini_a = st.date_input("Início A", min_date, min_value=min_date, max_value=max_date, key="ca_ini")
+            fim_a = st.date_input("Fim A",    max_date, min_value=min_date, max_value=max_date, key="ca_fim")
+        with c2:
+            st.markdown("**Período B**")
+            ini_b = st.date_input("Início B", min_date, min_value=min_date, max_value=max_date, key="cb_ini")
+            fim_b = st.date_input("Fim B",    max_date, min_value=min_date, max_value=max_date, key="cb_fim")
 
-    # ─── Gráfico de Evolução ───────────────────────────────────────────────────
-    st.subheader("📈 Evolução Financeira")
-    fig_evol = plot_evolucao(dados_df)
-    if fig_evol:
-        st.plotly_chart(fig_evol, use_container_width=True)
-    else:
-        st.info("Sem dados suficientes para o gráfico de evolução no período.")
+        df_a = filtrar_por_periodo(dados_df_completo, datetime.combine(ini_a, datetime.min.time()), datetime.combine(fim_a, datetime.max.time()))
+        df_b = filtrar_por_periodo(dados_df_completo, datetime.combine(ini_b, datetime.min.time()), datetime.combine(fim_b, datetime.max.time()))
+        comp = comparar_periodos(df_a, df_b)
+        a, b, delta = comp["periodo_a"], comp["periodo_b"], comp["delta"]
 
-    st.divider()
+        lucro_a_cls = "up" if a["lucro"] >= 0 else "down"
+        lucro_b_cls = "up" if b["lucro"] >= 0 else "down"
+        st.markdown(
+            f'<div class="compare-grid" style="margin-top:20px">'
+            f'<div class="compare-period">'
+            f'<div class="compare-period-label">📅 Período A | {ini_a.strftime("%d/%m/%y")} – {fim_a.strftime("%d/%m/%y")}</div>'
+            f'<div class="compare-row"><span class="compare-row-label">Faturamento</span><span class="compare-row-value">{fmt_brl(a["faturamento"])}</span></div>'
+            f'<div class="compare-row"><span class="compare-row-label">Despesa</span><span class="compare-row-value">{fmt_brl(a["despesa"])}</span></div>'
+            f'<div class="compare-row"><span class="compare-row-label">Lucro</span><span class="compare-row-value {lucro_a_cls}">{fmt_brl(a["lucro"])}</span></div>'
+            f'</div>'
+            f'<div class="compare-period">'
+            f'<div class="compare-period-label">📅 Período B | {ini_b.strftime("%d/%m/%y")} – {fim_b.strftime("%d/%m/%y")}</div>'
+            f'<div class="compare-row"><span class="compare-row-label">Faturamento</span><span class="compare-row-value">{fmt_brl(b["faturamento"])}</span></div>'
+            f'<div class="compare-row"><span class="compare-row-label">Despesa</span><span class="compare-row-value">{fmt_brl(b["despesa"])}</span></div>'
+            f'<div class="compare-row"><span class="compare-row-label">Lucro</span><span class="compare-row-value {lucro_b_cls}">{fmt_brl(b["lucro"])}</span></div>'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    # ─── Chat ──────────────────────────────────────────────────────────────────
-    st.subheader("💬 Conversa com o Analista")
+        st.markdown(
+            f'<div class="chart-card" style="margin-top:20px"><div class="chart-title">Variação A vs B</div>'
+            f'<div class="chart-subtitle">Diferença percentual do Período A em relação ao Período B</div>'
+            f'<div style="display:flex;gap:32px;margin-top:12px">'
+            f'<div><div style="font-size:0.75rem;color:#7a8aaa;margin-bottom:4px">Faturamento</div><div style="font-size:1.3rem;font-family:Syne,sans-serif;font-weight:700">{delta_html(delta["faturamento"])}</div></div>'
+            f'<div><div style="font-size:0.75rem;color:#7a8aaa;margin-bottom:4px">Despesa</div><div style="font-size:1.3rem;font-family:Syne,sans-serif;font-weight:700">{delta_html(-delta["despesa"])}</div></div>'
+            f'<div><div style="font-size:0.75rem;color:#7a8aaa;margin-bottom:4px">Lucro</div><div style="font-size:1.3rem;font-family:Syne,sans-serif;font-weight:700">{delta_html(delta["lucro"])}</div></div>'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    for msg in get_historico():
-        if isinstance(msg, HumanMessage):
-            st.chat_message("human").markdown(msg.content)
-        elif isinstance(msg, AIMessage):
-            with st.chat_message("ai"):
-                st.markdown(msg.content)
-                col_fb1, col_fb2, _ = st.columns([0.1, 0.1, 0.8])
-                with col_fb1:
-                    if st.button("👍", key=f"up_{hash(msg.content)}"):
-                        st.toast("Obrigado pelo feedback positivo!")
-                with col_fb2:
-                    if st.button("👎", key=f"dw_{hash(msg.content)}"):
-                        st.toast("Obrigado pelo feedback. Vou melhorar!")
+        st.markdown('<div class="chart-card" style="margin-top:4px"><div class="chart-title">Comparativo Visual</div><div class="chart-subtitle">Período A vs Período B por categoria</div>', unsafe_allow_html=True)
+        fig_comp = plot_comparativo_barras(comp)
+        if fig_comp: st.plotly_chart(fig_comp, width="stretch", config={"displayModeBar": False}, key="chart_comparativo")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    entrada = st.chat_input("Fale com o Analista")
-    if not entrada:
-        return
+        if not df_a.empty and not df_b.empty:
+            st.markdown('<div class="chart-card" style="margin-top:4px"><div class="chart-title">Evolução — Período A</div><div class="chart-subtitle">Faturamento · Despesa · Lucro</div>', unsafe_allow_html=True)
+            fa = plot_evolucao_area(df_a)
+            if fa: st.plotly_chart(fa, width="stretch", config={"displayModeBar": False}, key="chart_evolucao_a")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    entrada_limpa = re.sub(
-        r"<think>.*?</think>", "", entrada, flags=re.DOTALL | re.IGNORECASE
-    ).strip()
-    if not entrada_limpa:
-        st.info("(Comentário interno ignorado.)")
-        return
+            st.markdown('<div class="chart-card" style="margin-top:4px"><div class="chart-title">Evolução — Período B</div><div class="chart-subtitle">Faturamento · Despesa · Lucro</div>', unsafe_allow_html=True)
+            fb = plot_evolucao_area(df_b)
+            if fb: st.plotly_chart(fb, width="stretch", config={"displayModeBar": False}, key="chart_evolucao_b")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    st.chat_message("human").markdown(entrada_limpa)
-    adicionar_mensagem("human", entrada_limpa)
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB 3 — ANALISTA IA
+    # ══════════════════════════════════════════════════════════════════════════
+    with tab_chat:
+        st.markdown("""
+        <style>
+        div[data-baseweb="base-input"], div[data-baseweb="textarea"] { background-color: #10141f !important; border-color: #253050 !important; }
+        textarea, textarea:focus { background-color: #10141f !important; color: #e8edf5 !important; caret-color: #00e5a0 !important; }
+        textarea::placeholder { color: #3d4f6e !important; }
+        [data-testid="stBottom"], [data-testid="stBottom"] > div { background-color: #0a0d14 !important; }
+        [data-testid="stChatMessage"] > div[class] { align-items: flex-start !important; gap: 14px !important; }
+        </style>""", unsafe_allow_html=True)
 
-    cert_path, categoria = tentar_enviar_certidao(entrada_limpa)
-    if cert_path and categoria:
-        resposta = f"Aqui está a CND {categoria} conforme solicitado."
-        st.chat_message("ai").markdown(resposta)
-        with open(cert_path, "rb") as f:
-            st.download_button(f"📄 Baixar CND {categoria}", data=f.read(),
-                               file_name=cert_path.name, mime="application/pdf")
-        adicionar_mensagem("ai", resposta + f" [CND {categoria} anexada]")
-        return
+        st.markdown('<div class="section-label" style="margin-top:16px">Filtro de Contexto</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        chat_ini = c1.date_input("De",  min_date, min_value=min_date, max_value=max_date, key="ch_ini")
+        chat_fim = c2.date_input("Até", max_date, min_value=min_date, max_value=max_date, key="ch_fim")
 
-    with st.chat_message("ai"):
-        resposta_llm = consultar_modelo(chain, entrada_limpa)
-        st.markdown(resposta_llm)
-        col_fb1, col_fb2, _ = st.columns([0.1, 0.1, 0.8])
-        with col_fb1:
-            if st.button("👍", key=f"up_{hash(resposta_llm)}"):
-                st.toast("Obrigado pelo feedback positivo!")
-        with col_fb2:
-            if st.button("👎", key=f"dw_{hash(resposta_llm)}"):
-                st.toast("Obrigado pelo feedback. Vou melhorar!")
+        dados_chat = filtrar_por_periodo(dados_df_completo,
+                                         datetime.combine(chat_ini, datetime.min.time()),
+                                         datetime.combine(chat_fim, datetime.max.time()))
+        chain = _criar_chain(llm, dados_chat, chat_ini, chat_fim)
 
-    adicionar_mensagem("ai", resposta_llm)
+        cert_pendente = st.session_state.pop("cert_pendente", None)
+        if cert_pendente:
+            with open(cert_pendente["path"],"rb") as f:
+                st.download_button(label=f"📄 Baixar CND {cert_pendente['categoria']}",
+                                   data=f.read(), file_name=cert_pendente["nome"],
+                                   mime="application/pdf", key="cert_dl")
 
+        for msg in get_historico():
+            if isinstance(msg, HumanMessage): st.chat_message("human").markdown(msg.content)
+            elif isinstance(msg, AIMessage):  st.chat_message("ai").markdown(msg.content)
+
+        entrada = st.chat_input("Pergunte sobre os dados financeiros...")
+        if not entrada: return
+
+        entrada_limpa = re.sub(r"<think>.*?</think>", "", entrada, flags=re.DOTALL|re.IGNORECASE).strip()
+        if not entrada_limpa: return
+
+        adicionar_mensagem("human", entrada_limpa)
+
+        cert_path, categoria = tentar_enviar_certidao(entrada_limpa)
+        if cert_path and categoria:
+            adicionar_mensagem("ai", f"Aqui está a **CND {categoria}** conforme solicitado.")
+            st.session_state["cert_pendente"] = {"path": str(cert_path), "categoria": categoria, "nome": cert_path.name}
+            st.rerun()
+
+        with st.spinner("Analisando..."):
+            resposta = consultar_modelo(chain, entrada_limpa)
+        adicionar_mensagem("ai", resposta)
+        st.rerun()
+
+##############################
+# Main                       #
+##############################
 
 def main() -> None:
+    st.set_page_config(page_title=f"Dashboard · {CLIENT_NAME}", page_icon="📊",
+                       layout="wide", initial_sidebar_state="expanded")
+    st.markdown(THEME_CSS, unsafe_allow_html=True)
     if not API_KEY:
-        st.error("Variável GROQ_API_KEY não encontrada. Configure o arquivo .env.")
-        st.stop()
-
+        st.error("Variável GROQ_API_KEY não encontrada."); st.stop()
     llm = _criar_client()
-
     desenhar_sidebar(llm)
     pagina_chat(llm)
-
 
 if __name__ == "__main__":
     main()
