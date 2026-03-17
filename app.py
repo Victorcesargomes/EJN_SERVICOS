@@ -27,9 +27,8 @@ LOGO_PATH    = BASE_PATH / "logoo.png"
 CLIENT_NAME  = "EJN SERVIÇOS"
 MODEL_NAME   = "llama-3.3-70b-versatile"
 
-# ── Limites ultra-enxutos ─────────────────────────────────────────────────────
+# ── Limites de histórico ──────────────────────────────────────────────────────
 MAX_HISTORICO_MSGS = 6   # apenas as 6 últimas mensagens (3 trocas)
-# Não enviamos linhas brutas do CSV — apenas totais e resumos agregados
 # ─────────────────────────────────────────────────────────────────────────────
 
 load_dotenv()
@@ -214,37 +213,63 @@ def _fmt_brl(v: float) -> str:
     return f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
 
 
-# ─── CONTEXTO ULTRA-ENXUTO: ~120–160 tokens no total ─────────────────────────
+# ─── CONTEXTO ENRIQUECIDO E COMPRIMIDO ────────────────────────────────────────
 def construir_contexto(df: pd.DataFrame) -> str:
     """
-    Você fala sempre diretamente com o dono da EJN SERVIÇOS, dono da empresa EJN SERVIÇOS chama-se Elielcio.
     Envia APENAS dados agregados — sem nenhuma linha bruta do CSV.
-    O modelo recebe o suficiente para responder perguntas financeiras e de Ciência de dados.
+    Inclui tendência de lucro e melhor/pior mês para análise mais rica.
+    Estimativa: ~180–220 tokens no total.
     """
     if df.empty:
         return "Sem dados no período."
 
-    fat   = df["faturamento"].sum()
-    desp  = df["despesa"].sum()
-    lucro = df["lucro"].sum()
+    fat    = df["faturamento"].sum()
+    desp   = df["despesa"].sum()
+    lucro  = df["lucro"].sum()
     margem = (lucro / fat * 100) if fat > 0 else 0.0
 
+    # ── Tendência: últimos 2 meses vs 2 anteriores ────────────────────────────
+    tendencia = ""
+    if "data" in df.columns:
+        df2   = df.copy()
+        df2["m"] = df2["data"].dt.to_period("M")
+        meses = df2.groupby("m")["lucro"].sum().sort_index()
+        if len(meses) >= 4:
+            recente  = meses.iloc[-2:].mean()
+            anterior = meses.iloc[-4:-2].mean()
+            var = ((recente - anterior) / abs(anterior) * 100) if anterior != 0 else 0.0
+            tendencia = f" Tendência={var:+.1f}%"
+
     partes = [
-        f"Totais: Fat={_fmt_brl(fat)} Desp={_fmt_brl(desp)} Lucro={_fmt_brl(lucro)} Margem={margem:.1f}%"
+        f"Fat={_fmt_brl(fat)} Desp={_fmt_brl(desp)} Lucro={_fmt_brl(lucro)} Margem={margem:.1f}%{tendencia}"
     ]
 
-    # Resumo mensal — máx 6 meses mais recentes
+    # ── Resumo mensal — máx 6 meses mais recentes ────────────────────────────
     if "data" in df.columns:
         df2 = df.copy()
         df2["m"] = df2["data"].dt.to_period("M").astype(str)
         agg = df2.groupby("m")[["faturamento","despesa","lucro"]].sum().tail(6)
-        linhas_mes = [f"{m}: fat={_fmt_brl(r.faturamento)} desp={_fmt_brl(r.despesa)} lucro={_fmt_brl(r.lucro)}" for m, r in agg.iterrows()]
-        partes.append("Mensal: " + " | ".join(linhas_mes))
+        linhas = [
+            f"{m}:fat={_fmt_brl(r.faturamento)},desp={_fmt_brl(r.despesa)},luc={_fmt_brl(r.lucro)}"
+            for m, r in agg.iterrows()
+        ]
+        partes.append("Mensal|" + "|".join(linhas))
 
-    # Top 3 categorias de despesa
+    # ── Top 3 categorias de despesa ──────────────────────────────────────────
     if "descricao" in df.columns and desp > 0:
         top3 = df[df["despesa"] > 0].groupby("descricao")["despesa"].sum().nlargest(3)
-        partes.append("Top3Desp: " + " | ".join(f"{k}={_fmt_brl(v)}" for k, v in top3.items()))
+        partes.append("Top3Desp:" + "|".join(f"{k}={_fmt_brl(v)}" for k, v in top3.items()))
+
+    # ── Melhor e pior mês ────────────────────────────────────────────────────
+    if "data" in df.columns:
+        df2 = df.copy()
+        df2["m"] = df2["data"].dt.to_period("M").astype(str)
+        agg_lucro = df2.groupby("m")["lucro"].sum()
+        if not agg_lucro.empty:
+            partes.append(
+                f"MelhorMes={agg_lucro.idxmax()}({_fmt_brl(agg_lucro.max())}) "
+                f"PiorMes={agg_lucro.idxmin()}({_fmt_brl(agg_lucro.min())})"
+            )
 
     return "\n".join(partes)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -374,6 +399,73 @@ def adicionar_mensagem(role: str, conteudo: str) -> None:
 def limpar_historico() -> None:
     st.session_state["historico"] = []
 
+
+def resumir_historico_se_necessario() -> None:
+    """
+    Quando o histórico atinge o limite, comprime as mensagens mais antigas
+    em um único bloco de contexto, preservando apenas as 4 mais recentes.
+    Reduz consumo de tokens em ~40–120 tokens por chamada.
+    """
+    h = get_historico()
+    if len(h) < MAX_HISTORICO_MSGS:
+        return
+    # Pega as mensagens que serão descartadas e cria um resumo comprimido
+    antigas = h[:-4]
+    linhas = []
+    for m in antigas:
+        prefixo = "U" if isinstance(m, HumanMessage) else "A"
+        linhas.append(f"{prefixo}: {m.content[:120]}")
+    resumo_txt = " | ".join(linhas)[:400]
+    resumo = AIMessage(content=f"[Contexto anterior resumido: {resumo_txt}]")
+    st.session_state["historico"] = [resumo] + h[-4:]
+
+##############################
+# Respostas Rápidas (sem LLM)#
+##############################
+
+# Padrões que respondem diretamente dos dados — zero tokens gastos
+RESPOSTAS_RAPIDAS: dict[str, Any] = {
+    r"\bfaturamento\b":         lambda df: f"**Faturamento total:** {_fmt_brl(df['faturamento'].sum())}",
+    r"\bdespesa[s]?\b":         lambda df: f"**Despesas totais:** {_fmt_brl(df['despesa'].sum())}",
+    r"\blucro\b":               lambda df: f"**Lucro líquido:** {_fmt_brl(df['lucro'].sum())}",
+    r"\bmargem\b":              lambda df: (
+        f"**Margem de lucro:** {df['lucro'].sum()/df['faturamento'].sum()*100:.1f}%"
+        if df["faturamento"].sum() > 0 else "Sem faturamento no período."
+    ),
+    r"\bmelhor\s+m[eê]s\b":    lambda df: _melhor_pior_mes(df, melhor=True),
+    r"\bpior\s+m[eê]s\b":      lambda df: _melhor_pior_mes(df, melhor=False),
+    r"\btotal\s+de\s+registros?\b": lambda df: f"**Total de registros:** {len(df)}",
+}
+
+def _melhor_pior_mes(df: pd.DataFrame, melhor: bool) -> str:
+    if df.empty or "data" not in df.columns:
+        return "Dados insuficientes."
+    df2 = df.copy()
+    df2["m"] = df2["data"].dt.to_period("M").astype(str)
+    agg = df2.groupby("m")["lucro"].sum()
+    if agg.empty:
+        return "Dados insuficientes."
+    if melhor:
+        return f"**Melhor mês:** {agg.idxmax()} com lucro de {_fmt_brl(agg.max())}"
+    return f"**Pior mês:** {agg.idxmin()} com lucro de {_fmt_brl(agg.min())}"
+
+
+def resposta_rapida(entrada: str, df: pd.DataFrame) -> Optional[str]:
+    """
+    Tenta responder perguntas simples direto dos dados, sem chamar o LLM.
+    Só aciona se a mensagem for curta (< 70 chars) e bater exatamente num padrão.
+    """
+    if len(entrada) > 70:
+        return None
+    txt = entrada.lower()
+    for padrao, fn in RESPOSTAS_RAPIDAS.items():
+        if re.search(padrao, txt):
+            try:
+                return fn(df)
+            except Exception:
+                return None
+    return None
+
 ##############################
 # LLM                        #
 ##############################
@@ -386,13 +478,13 @@ def _criar_client() -> ChatGroq:
 def _criar_chain(llm: ChatGroq, df_filtrado: pd.DataFrame, data_inicio, data_fim):
     periodo_str = f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
 
-    # ── System prompt mínimo — estimativa: ~150–200 tokens ───────────────────
+    # ── System prompt enxuto — ~150–180 tokens ───────────────────────────────
     system_message = (
-        f"Você é Victor, assistente financeiro da empresa {CLIENT_NAME}. "
-        f"Responda SOMENTE com base nos dados abaixo. Português. Respostas curtas e diretas.\n\n"
+        f"Assistente financeiro da {CLIENT_NAME} (dono: Elielcio). "
+        f"Responda em português, de forma direta e objetiva.\n"
         f"Período: {periodo_str}\n"
-        f"{construir_contexto(df_filtrado)}\n\n"
-        f"Certidões disponíveis: {', '.join(CERTIDOES.keys()) or 'nenhuma'}"
+        f"{construir_contexto(df_filtrado)}\n"
+        f"Certidões: {', '.join(CERTIDOES.keys()) or 'nenhuma'}"
     )
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -405,6 +497,9 @@ def _criar_chain(llm: ChatGroq, df_filtrado: pd.DataFrame, data_inicio, data_fim
 
 
 def consultar_modelo(chain, entrada: str) -> str:
+    # Comprime histórico antes de enviar para economizar tokens
+    resumir_historico_se_necessario()
+
     try:
         response = chain.invoke({"input": entrada, "chat_history": get_historico()})
 
@@ -495,7 +590,7 @@ def desenhar_sidebar(llm: ChatGroq) -> None:
                 f'Modelo: <span style="color:#7a8aaa">{MODEL_NAME}</span><br>'
                 f'Linhas CSV: <span style="color:#7a8aaa">{len(dados_df_completo)}</span><br>'
                 f'Histórico: <span style="color:#7a8aaa">máx. {MAX_HISTORICO_MSGS} msgs</span><br>'
-                f'Contexto: <span style="color:#7a8aaa">apenas agregados</span>'
+                f'Contexto: <span style="color:#7a8aaa">agregados + tendência</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -724,12 +819,20 @@ def pagina_chat(llm: ChatGroq) -> None:
 
         adicionar_mensagem("human", entrada_limpa)
 
+        # ── 1. Certidão? ─────────────────────────────────────────────────────
         cert_path, categoria = tentar_enviar_certidao(entrada_limpa)
         if cert_path and categoria:
             adicionar_mensagem("ai", f"Aqui está a **CND {categoria}** conforme solicitado.")
             st.session_state["cert_pendente"] = {"path": str(cert_path), "categoria": categoria, "nome": cert_path.name}
             st.rerun()
 
+        # ── 2. Resposta rápida sem LLM? ──────────────────────────────────────
+        rapida = resposta_rapida(entrada_limpa, dados_chat)
+        if rapida:
+            adicionar_mensagem("ai", rapida)
+            st.rerun()
+
+        # ── 3. LLM completo ──────────────────────────────────────────────────
         with st.spinner("Analisando..."):
             resposta = consultar_modelo(chain, entrada_limpa)
         adicionar_mensagem("ai", resposta)
