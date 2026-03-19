@@ -126,3 +126,123 @@ data;faturamento;despesa;descricao;lucro
 31/12/2025;2500,00;0,00;Resgate Aplicação_Financeira;2500,00
 31/12/2025;0,00;2054,61;Despesas Diversas;-2054,61
 31/12/2025;0,00;600,00;Despesas Diversas;-600,00
+02/01/2026;0,00;85,56;Combustível;-85,56
+03/01/2026;0,00;80,00;Despesas Diversas;-80,00
+03/01/2026;0,00;85,00;Despesas Diversas;-85,00
+03/01/2026;0,00;25,00;Despesas Diversas;-25,00
+03/01/2026;0,00;15,00;Despesas Diversas;-15,00
+03/01/2026;0,00;340,00;Despesas Diversas;-340,00
+05/01/2026;0,00;5,80;Pedágios;-5,80
+05/01/2026;0,00;5,80;Pedágios;-5,80
+05/01/2026;0,00;100,00;Mão de Obra;-100,00
+05/01/2026;0,00;81,26;Despesas Diversas;-94,00
+06/01/2026;0,00;81,26;Despesas Diversas;-81,26
+06/01/2026;0,00;6,00;Despesas Diversas;-6,00
+06/01/2026;0,00;30,00;Despesas Diversas;-30,00
+07/01/2026;0,00;16,00;Despesas Diversas;-16,00
+08/01/2026;0,00;13,00;Pedágios;-13,00
+08/01/2026;0,00;100,00;Despesas Diversas;-100,00
+08/01/2026;0,00;100,00;Despesas Diversas;-100,00
+09/01/2026;10000,00;0,00;Resgate Aplicação_Financeira;10000,00
+09/01/2026;0,00;144,00;Despesas Diversas;-144,00
+09/01/2026;0,00;62,00;Despesas Diversas;-62,00
+09/01/2026;0,00;24,00;Despesas Diversas;-24,00
+09/01/2026;0,00;38,70;Despesas Diversas;-38,70
+10/01/2026;0,00;54,69;Combustível;-54,69
+10/01/2026;0,00;50,00;Mão de Obra;-50,00
+10/01/2026;0,00;117,70;Despesas Diversas;-117,70
+10/01/2026;0,00;46,70;Despesas Diversas;-46,70
+11/01/2026;0,00;100,00;Mão de Obra;-100,00
+12/01/2026;0,00;65,72;Combustível;-65,72
+12/01/2026;0,00;89,55;Combustível;-89,55
+12/01/2026;0,00;76,82;Combustível;-76,82
+12/01/2026;0,00;88,00;Despesas Diversas;-88,00
+13/01/2026;0,00;11,60;Pedágios;-11,60
+13/01/2026;0,00;11,60;Pedágios;-11,60
+13/01/2026;0,00;13,00;Pedágios;-13,00
+13/01/2026;0,00;50,00;Mão de Obra;-50,00
+13/01/2026;0,00;520,00;Despesas Diversas;-520,00
+14/01/2026;0,00;86,21;Combustível;-86,21
+14/01/2026;0,00;11,60;Pedágios;-11,60
+14/01/2026;0,00;11,60;Pedágios;-11,60
+14/01/2026;0,00;100,00;Mão de Obra;-100,00
+14/01/2026;0,00;200,00;Despesas Diversas;-200,00
+14/01/2026;0,00;36,99;Despesas Diversas;-36,99
+14/01/2026;0,00;900,00;Despesas Diversas;-900,00
+15/01/2026;0,00;30,00;Combustível;-30,00
+15/01/2026;0,00;5,80;Pedágios;-5,80
+15/01/2026;0,00;5,80;Pedágios;-5,80
+15/01/2026;0,00;300,00;Mão de Obra;-300,00
+15/01/2026;0,00;14,00;Despesas Diversas;-14,00
+15/01/2026;0,00;50,00;Despesas Diversas;-50,00
+15/01/2026;0,00;20,00;Despesas Diversas;-20,00
+16/01/2026;0,00;800,00;Mão de Obra;-800,00
+16/01/2026;0,00;200,00;Despesas Diversas;-200,00
+16/01/2026;0,00;40,17;Despesas Diversas;-40,17
+17/01/2026;0,00;13,00;Despesas Diversas;-13,00
+17/01/2026;0,00;70,00;Despesas Diversas;-70,00
+17/01/2026;0,00;81,98;Despesas Diversas;-81,98
+17/01/2026;0,00;16,00;Despesas Diversas;-16,00
+18/01/2026;0,00;85,76;Despesas Diversas;-85,76
+18/01/2026;0,00;26,79;Despesas Diversas;-26,79
+18/01/2026;0,00;20,00;Despesas Diversas;-20,00
+18/01/2026;0,00;47,45;Despesas Diversas;-47,45
+18/01/2026;0,00;135,00;Despesas Diversas;-135,00
+19/01/2026;0,00;175,64;Combustível;-175,64
+19/01/2026;0,00;269,15;Simples Nacional;-269,15
+19/01/2026;0,00;3000,00;Despesas Diversas;-3000,00
+19/01/2026;0,00;55,48;Despesas Diversas;-55,48
+19/01/2026;0,00;78,02;Despesas Diversas;-78,02
+19/01/2026;0,00;20,00;Despesas Diversas;-20,00
+20/01/2026;227,68;0,00;Restituição IR;227,68
+20/01/2026;2393,55;0,00;Restituição IR;2393,55
+20/01/2026;0,00;89,68;Despesas Diversas;-89,68
+20/01/2026;0,00;12,00;Despesas Diversas;-12,00
+20/01/2026;0,00;20,00;Despesas Diversas;-20,00
+20/01/2026;0,00;52,00;Despesas Diversas;-52,00
+20/01/2026;0,00;100,00;Despesas Diversas;-100,00
+20/01/2026;0,00;1000,00;Despesas Diversas;-1000,00
+20/01/2026;0,00;80,00;Despesas Diversas;-80,00
+20/01/2026;0,00;45,10;Despesas Diversas;-45,10
+21/01/2026;0,00;13,00;Despesas Diversas;-13,00
+21/01/2026;0,00;700,00;Despesas Diversas;-700,00
+21/01/2026;0,00;25,00;Despesas Diversas;-25,00
+22/01/2026;0,00;108,62;Combustível;-108,62
+23/01/2026;0,00;600,00;Despesas Diversas;-600,00
+23/01/2026;0,00;24,00;Despesas Diversas;-24,00
+23/01/2026;0,00;127,04;Despesas Diversas;-127,04
+24/01/2026;0,00;76,00;Despesas Diversas;-76,00
+25/01/2026;0,00;32,65;Despesas Diversas;-32,65
+25/01/2026;0,00;22,97;Despesas Diversas;-22,97
+25/01/2026;0,00;10,00;Despesas Diversas;-10,00
+25/01/2026;0,00;50,00;Despesas Diversas;-50,00
+25/01/2026;0,00;25,90;Despesas Diversas;-25,90
+26/01/2026;0,00;24,00;Despesas Diversas;-24,00
+26/01/2026;0,00;5,00;Despesas Diversas;-5,00
+26/01/2026;0,00;71,95;Despesas Diversas;-71,95
+26/01/2026;0,00;14,00;Despesas Diversas;-14,00
+27/01/2026;5000,00;0,00;Resgate Aplicação_Financeira;5000,00
+27/01/2026;0,00;86,22;Combustível;-86,22
+27/01/2026;0,00;200,00;Mão de Obra;-200,00
+27/01/2026;0,00;20,00;Despesas Diversas;-20,00
+27/01/2026;0,00;1119,71;Despesas Diversas;-1119,71
+28/01/2026;0,00;72,56;Combustível;-72,56
+28/01/2026;0,00;11,60;Pedágios;-11,60
+28/01/2026;0,00;17,40;Pedágios;-17,40
+29/01/2026;0,00;11,60;Pedágios;-11,60
+29/01/2026;0,00;11,60;Pedágios;-11,60
+29/01/2026;0,00;60,00;Despesas Diversas;-60,00
+29/01/2026;0,00;10,00;Despesas Diversas;-10,00
+29/01/2026;0,00;16,00;Despesas Diversas;-16,00
+30/01/2026;0,00;51,36;Combustível;-51,36
+30/01/2026;0,00;67,21;Combustível;-67,21
+30/01/2026;0,00;11,60;Pedágios;-11,60
+30/01/2026;0,00;11,60;Pedágios;-11,60
+30/01/2026;0,00;500,00;Mão de Obra;-500,00
+30/01/2026;0,00;37,00;Despesas Diversas;-37,00
+30/01/2026;0,00;100,00;Despesas Diversas;-100,00
+30/01/2026;0,00;2009,20;Despesas Diversas;-2009,20
+31/01/2026;10000,00;0,00;Resgate Aplicação_Financeira;10000,00
+31/01/2026;0,00;8885,00;Despesas Diversas;-8885,00
+31/01/2026;0,00;255,00;Despesas Diversas;-255,00
+31/01/2026;0,00;170,00;Despesas Diversas;-170,00
